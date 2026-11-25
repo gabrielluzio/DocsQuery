@@ -1,78 +1,63 @@
 from fastapi import UploadFile
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi import  HTTPException
 import pymupdf
+from dependencies import obter_usuario_id
 
-Router_documentos = APIRouter(prefix= "/documentos", tags=["/documentos"])
 
+Router_documentos = APIRouter(prefix= "/documentos", tags=["documentos"], dependencies=[Depends(obter_usuario_id)])
 
+documentos_pdf = {}
 @Router_documentos.post("/criar_documentos")
 async def upload_file(arquivo: UploadFile):
-    """
-Recebe e processa arquivos PDF enviados por meio de uma rota da API.
-
-Utiliza a classe UploadFile, do FastAPI, para receber e acessar o
-conteúdo do arquivo enviado na requisição.
-
-Em seguida, utiliza a biblioteca PyMuPDF para abrir o documento PDF
-a partir dos bytes recebidos, permitindo percorrer suas páginas
-individualmente e extrair o conteúdo de cada uma.
-    """
     
-    tamanho_mxm = 10 * 1024 * 1024 #definindo tamanho de 10 MiB limite
-    tamanho_arquivo = arquivo.size #pega o tamanho do arquivo para fazer tratamento de eros
+    tamanho_mxm = 10 * 1024 * 1024 # Define o tamanho máximo permitido para o arquivo, em bytes (10 MB).
+    tamanho_arquivo = arquivo.size # Obtém o tamanho do arquivo enviado e armazena na variável tamanho_arquivo.
     
-    await arquivo.seek(0) #move o cursor de leitura para o inicio do arquivo, para identificar um pdf
+    await arquivo.seek(0) # Retorna o cursor de leitura para o início do arquivo, permitindo ler novamente seu conteúdo e verificar se ele possui a assinatura de um PDF.
 
+
+    # tratamento de erros para verificar se o arquivo e maior que tamanho maximo, e para verificar se o arquivo esta vazio. 
     if arquivo.size is None:
           raise HTTPException(status_code=400, detail="Não foi possível identificar o tamanho do arquivo. ")
     elif tamanho_arquivo > tamanho_mxm:
                 raise HTTPException(status_code=413, detail="Conteúdo grande demais. ")
+
     
-    leitura_arquivo = await arquivo.read()#define uma leitura do arquivo
+    leitura_arquivo = await arquivo.read()# Lê todo o conteúdo do arquivo a partir da posição atual do cursor e armazena os dados em bytes na variável leitura_arquivo.
 
-
+    # tratamento de erros para arquivo vazio, e para verficar se o arquivo e um PDF valido
     if tamanho_arquivo == 0:
             raise HTTPException(status_code=400, detail="arquivo vazio. ")
     elif not leitura_arquivo.startswith(b"%PDF-"):
         raise HTTPException(status_code=415, detail="Tipo de mídia não suportado. ")
-  
+
+
+    # Abre o arquivo PDF a partir dos bytes armazenados em 'leitura_arquivo', permitindo acessar suas páginas para extrair o conteúdo posteriormente.
     try:
         documento_aberto_pymu = pymupdf.Document(stream=leitura_arquivo, filetype="pdf")
-        # Abre o arquivo PDF a partir dos bytes armazenados em 'leitura_arquivo',
-        # permitindo acessar suas páginas e extrair o conteúdo posteriormente.
     except pymupdf.FileDataError:
           raise HTTPException(
           status_code=422,
           detail="O arquivo PDF está corrompido ou é inválido"
     )
 
+    
+    #faz o tratamento de erros para arquivo sem texto extraivel, e faz a iteração de cada apgina do documento para extrair conteudo das apginas de forma separada. 
     paginas_pdf = {}
     try:
-        for page in documento_aberto_pymu: #iterar documento aberto
-            texto_pdf = page.get_text() # Extrai o conteúdo da página atual do PDF.
+        for page in documento_aberto_pymu: #Percorre todas as páginas do documento PDF.
+            texto_pdf = page.get_text() # 	Extrai o texto da página atual do PDF.
             if not texto_pdf.strip():
                 raise HTTPException(
                         status_code=422,
                         detail=f"Pagina {page.number+1} não possui texto extraível"
                 )
 
-            paginas_pdf [f"paginas {page.number + 1}"] = texto_pdf# Armazena o texto extraído no dicionário, utilizando
-                                                                # o número da página como identificador.
+            #dicionario para facilitar a entrega de conteudo para o GEMINI. 
+            documentos_pdf [page.number+1] = texto_pdf
+        return documentos_pdf
+           
     finally:
         documento_aberto_pymu.close()
     
-    return paginas_pdf 
-
-
-
-      
-
-
-
-
-    
-
-
-
-   

@@ -29,7 +29,7 @@ def obter_usuario_id(
             raise ValueError
 
     except (ValueError, TypeError, KeyError):
-        raise HTTPException(
+            raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Identificador de usuário inválido",
             headers={"WWW-Authenticate": "Bearer"}

@@ -24,3 +24,15 @@ class cadastro(BaseModel):
 class login(BaseModel):
     email:EmailStr
     senha: Annotated[str, Field(minlength=8)]
+
+
+class pergunta_pydantic(BaseModel):
+      parametro_pergunta:str
+
+      @field_validator("parametro_pergunta")
+      @classmethod
+      def validar_pergunta(cls, value_pergunta):
+            if len(value_pergunta.strip()) == 0:
+                  raise ValueError("campo vazio. ")
+            return value_pergunta
+            
