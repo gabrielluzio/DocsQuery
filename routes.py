@@ -10,6 +10,7 @@ from argon2.exceptions import VerifyMismatchError
 from jwt_handler import gerar_token
 from service_ia import analisar
 from routes_documentos import documentos_pdf
+from dependencies import obter_usuario_id
 
 
 Router = APIRouter(prefix = "/auth", tags = ["/auth"]) 
@@ -62,8 +63,12 @@ def rota_login(pylogin: login, db: Session = Depends(get_db)):
      }
 
 
-@Router.post("/pergunta_usuario")
-def funcao_pergunta(pergunta_local:pergunta_pydantic ):
+@Router.post("/pergunta_usuario", dependencies=[Depends(obter_usuario_id)])
+def funcao_pergunta(pergunta_local:pergunta_pydantic):
     pergunta_final = pergunta_local.parametro_pergunta
     resposta = analisar(documentos_pdf, pergunta_final)
     return resposta
+
+  
+
+
